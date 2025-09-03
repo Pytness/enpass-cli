@@ -1,0 +1,42 @@
+[package]
+name = "enpass-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "CLI tool for Enpass password manager"
+
+[dependencies]
+# Command line argument parsing
+clap = { version = "4.4", features = ["derive"] }
+# Logging
+log = "0.4"
+env_logger = "0.10"
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+# Encryption and cryptography
+aes-gcm = "0.10"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+# SQLite access
+rusqlite = { version = "0.29", features = ["bundled", "hooks", "bundled-sqlcipher"] }
+# JSON handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# File and path handling
+dirs = "5.0"
+# Terminal UI
+crossterm = "0.27"
+tui = { package = "ratatui", version = "0.23" }
+# Other utilities
+chrono = "0.4"
+rpassword = "7.2"
+clipboard = "0.5"
+xml-rs = "0.8"
+cbc = { version = "0.1.2", features = ["alloc", "std"] }
+aes = { version = "0.8.4", features = ["hazmat"] }
+
+[dev-dependencies]
+tempfile = "3.8"
