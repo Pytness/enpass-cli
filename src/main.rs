@@ -173,7 +173,7 @@ fn output_data_or_log(data: &[CardData], args: &Args) {
     } else {
         for card in data {
             info!(
-                "title: {}  login: {}  cat.: {}  label: {}",
+                "title: {}  login: {}  category: {}  label: {}",
                 card.title, card.login, card.category, card.label
             );
         }
@@ -185,6 +185,8 @@ fn list_entries(
     args: &Args,
     filters: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Listing entries of type: {}", args.r#type);
+    println!("Using filters: {:?}", filters);
     let mut cards = vault.get_entries(&args.r#type, filters)?;
 
     if args.sort {
@@ -282,6 +284,7 @@ fn assemble_vault_credentials(
 
     if !credentials.is_complete() {
         credentials.password = Some(prompt(args, "vault password"));
+        println!("{:?}", credentials.password);
     }
 
     credentials
@@ -314,10 +317,13 @@ fn initialize_store(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
     let args = Args::parse();
 
     // Set up logging based on the log level
-    env_logger::init();
+    log::set_max_level(log::LevelFilter::Trace);
+
+    // set log level
 
     match args.command {
         Some(Commands::Version) => {
@@ -358,7 +364,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    debug!("Assembling vault credentials");
     let credentials = assemble_vault_credentials(&args, store.as_mut());
+    debug!("Opening vault");
 
     vault.open(&credentials)?;
     debug!("Opened vault");

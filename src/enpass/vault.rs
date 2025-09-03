@@ -70,7 +70,11 @@ impl Vault {
         );
 
         Ok(Self {
-            filter_fields: vec!["title".to_string(), "subtitle".to_string()],
+            filter_fields: vec![
+                "title".to_string(),
+                "subtitle".to_string(),
+                "label".to_string(),
+            ],
             filter_and: false,
             database_path,
             vault_info_path,
@@ -85,14 +89,28 @@ impl Vault {
         let db_key = self.generate_and_set_db_key(credentials)?;
 
         log::debug!("Opening encrypted database");
+        log::debug!("Database path: {}", self.database_path.display());
         self.db = Some(self.open_encrypted_database(&self.database_path, &db_key)?);
+        log::debug!("Database opened successfully");
+
+        log::debug!("Verifying database connection");
 
         // Verify the connection works by checking for the 'item' table
-        let mut stmt = self
-            .connection()?
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='item'")?;
+        let conn = self.connection()?;
 
-        let table_name: String = stmt.query_row([], |row| row.get(0))?;
+        log::debug!("Connected to database, checking for 'item' table");
+        let mut stmt =
+            conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='item'")?;
+
+        log::debug!("Checking for 'item' table in database");
+
+        let table_name: String = stmt.query_row([], |row| {
+            log::debug!("Found table row");
+            row.get(0)
+        })?;
+
+        log::debug!("Found table: {}", table_name);
+
         if table_name != "item" {
             return Err(anyhow!("Could not connect to database"));
         }
@@ -150,6 +168,7 @@ impl Vault {
     // Private helper methods
 
     fn connection(&self) -> Result<&Connection> {
+        log::debug!("Retrieving database connection");
         self.db
             .as_ref()
             .ok_or_else(|| anyhow!("Database not connected"))
@@ -161,11 +180,21 @@ impl Vault {
         let key_hex = hex::encode(db_key);
         let key_str = &key_hex[..MASTER_KEY_LENGTH];
 
-        let conn = Connection::open(path)?;
+        log::debug!("Opening database with key: x'{}'", key_str);
+        log::debug!("Database path: {}", path.display());
+        // open as sqlite3
+
+        let conn = Connection::open(path)
+            .with_context(|| format!("Could not open database: {}", path.display()))?;
+
+        log::debug!("Database connection established");
+        log::debug!("Pragma key: x'{}'", key_str);
 
         // Set up SQLCipher encryption
         conn.pragma_update(None, "key", &format!("x'{}'", key_str))?;
         conn.pragma_update(None, "cipher_compatibility", &3)?;
+
+        log::debug!("Database encryption configured");
 
         Ok(conn)
     }
@@ -196,8 +225,16 @@ impl Vault {
 
         log::debug!("Extracting salt from database");
         let key_salt = extract_salt(&self.database_path)?;
+        log::debug!("Extracted salt: {}", hex::encode(&key_salt));
 
         log::debug!("Deriving decryption key");
+        log::debug!(
+            "KDF: {}, iterations: {}, encryption: {}",
+            self.vault_info.kdf_algo,
+            self.vault_info.kdf_iter,
+            self.vault_info.encryption_algo
+        );
+
         let db_key = derive_key(
             &master_password,
             &key_salt,
@@ -222,12 +259,12 @@ impl Vault {
 
         let mut where_clauses: Vec<String> = vec!["item.deleted = ?".to_string()];
 
-        let zero: i64 = 0;
         let mut params: Vec<String> = vec!["0".to_string()]; // Exclude deleted items
         if !card_type.is_empty() {
             where_clauses.push("type = ?".to_string());
             params.push(card_type.to_string());
         }
+
         for filter in filters {
             let mut field_clauses = Vec::<String>::new();
             for field in &self.filter_fields {
@@ -248,12 +285,14 @@ impl Vault {
             query.push_str(&where_clauses.join(" AND "));
         }
         query.push_str(" ORDER BY title COLLATE NOCASE ASC");
+
         log::debug!("Executing query: {}", query);
+        log::debug!("With parameters: {:?}", params);
         let mut stmt = conn.prepare(&query)?;
 
         let sql_params: Vec<&dyn ToSql> = params.iter().map(|p| p as &dyn ToSql).collect();
 
-        let rows = stmt
+        let cards = stmt
             .query_map(sql_params.as_slice(), |row| {
                 let card = Card::from(row);
                 Ok(card)
@@ -262,7 +301,7 @@ impl Vault {
             .filter_map(|res| res.ok())
             .collect();
 
-        Ok(rows)
+        Ok(cards)
     }
 }
 

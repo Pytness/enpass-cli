@@ -56,6 +56,8 @@ impl Card {
         }
 
         // The key consists of the AES key (32 bytes) and a nonce (12 bytes) for GCM
+        log::debug!("Item key (hex): {:?}", hex::encode(&self.item_key));
+        log::debug!("Item key length: {}", self.item_key.len());
         if self.item_key.len() < 44 {
             return Err(anyhow!("Invalid key length"));
         }
@@ -95,7 +97,8 @@ impl Card {
 
 impl From<&Row<'_>> for Card {
     fn from(row: &Row<'_>) -> Self {
-        Card {
+        //print all columns for debugging
+        let card = Card {
             uuid: row.get("uuid").unwrap_or_default(),
             created_at: row.get("createdAt").unwrap_or_default(),
             card_type: row.get("type").unwrap_or_default(),
@@ -113,10 +116,25 @@ impl From<&Row<'_>> for Card {
             raw_value: row.get("value").unwrap_or_default(),
             value: row.get("value").unwrap_or_default(),
             item_key: row
-                .get::<_, Option<Vec<u8>>>("itemKey")
+                .get::<_, Option<Vec<u8>>>("key")
                 .unwrap_or(None)
                 .unwrap_or_default(),
-        }
+        };
+
+        println!("uuid: {}", card.uuid);
+        println!("title: {}", card.title);
+        println!("subtitle: {}", card.subtitle);
+        println!("type: {}", card.card_type);
+        println!("category: {}", card.category);
+        println!("trashed: {}", card.trashed);
+        println!("deleted: {}", card.deleted);
+        println!("sensitive: {}", card.sensitive);
+        println!("icon: {}", card.icon);
+        println!("raw_value: {}", card.raw_value);
+        println!("value (encrypted): {}", card.value);
+        println!("item_key (hex): {:?}", &card.item_key);
+
+        card
     }
 }
 
