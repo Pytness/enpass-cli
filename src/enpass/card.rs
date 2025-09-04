@@ -1,7 +1,7 @@
 //! Card structure for Enpass items
 
 use aes_gcm::{
-    aead::{Aead, KeyInit},
+    aead::{Aead, KeyInit, Payload},
     Aes256Gcm, Nonce,
 };
 use anyhow::{anyhow, Context, Result};
@@ -84,11 +84,13 @@ impl Card {
         let nonce = Nonce::from_slice(nonce);
 
         // Decrypt the ciphertext and verify the AAD
+        let payload = Payload {
+            msg: &ciphertext_and_tag,
+            aad: &header,
+        };
+
         let plaintext = cipher
-            .decrypt(
-                nonce,
-                [&header[..], &ciphertext_and_tag[..]].concat().as_ref(),
-            )
+            .decrypt(nonce, payload)
             .map_err(|_| anyhow!("Could not decrypt data"))?;
 
         String::from_utf8(plaintext).context("Decrypted data is not valid UTF-8")
