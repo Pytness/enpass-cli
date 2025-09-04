@@ -238,7 +238,28 @@ fn entry_password(
     args: &Args,
     filters: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let card = vault.get_entry(&args.r#type, filters, true)?;
+    let cards = vault.get_entries(&args.r#type, filters)?;
+
+    for (index, card) in cards.iter().enumerate() {
+        println!(
+            "[{}] title: {}  login: {}",
+            index, card.title, card.subtitle
+        );
+    }
+
+    print!("Select entry number: ");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+    let selection: usize = input.trim().parse().unwrap_or_else(|_| {
+        error!("Invalid selection");
+        process::exit(1);
+    });
+
+    let card = cards.get(selection).unwrap_or_else(|| {
+        error!("Selection out of range");
+        process::exit(1);
+    });
+
     let decrypted = card.decrypt()?;
     println!("{}", decrypted);
     Ok(())
